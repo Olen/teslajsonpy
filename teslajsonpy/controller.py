@@ -1657,8 +1657,8 @@ class Controller:
 
     def _process_websocket_disconnect(self, data):
         vehicle_id = int(data["tag"])
-        vin = self.__vehicle_id_vin_map[vehicle_id]
-        _LOGGER.debug("Disconnected %s from websocket", vin[-5:])
+        vin = self._vehicle_id_to_vin(vehicle_id)
+        _LOGGER.debug("%s: Disconnected from websocket", vin[-5:])
 
     @wake_up
     async def api(
