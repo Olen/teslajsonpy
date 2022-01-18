@@ -84,6 +84,7 @@ class Connection:
             self.__sethead(access_token=self.access_token, expiration=self.expiration)
             _LOGGER.debug("Connecting with existing access token")
         self.websocket = None
+        self.websocket_session = aiohttp.ClientSession()
         self.mfa_code: Text = ""
         self.auth_domain: URL = URL(auth_domain)
 
@@ -296,8 +297,7 @@ class Connection:
         timeout = last_message_time + DRIVING_INTERVAL
         if not self.websocket or self.websocket.closed:
             _LOGGER.debug("%s:Connecting to websocket %s", vin[-5:], self.websocket_url)
-            session = aiohttp.ClientSession()
-            self.websocket = await session.ws_connect(
+            self.websocket = await self.websocket_session.ws_connect(
                 url=self.websocket_url, heartbeat=10
             )
             # self.websocket = await websockets.client.connect(
