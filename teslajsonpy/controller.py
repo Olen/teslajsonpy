@@ -903,7 +903,8 @@ class Controller:
                     self.__driving[vin] = response["drive_state"]
                     self.__gui[vin] = response["gui_settings"]
                     self._last_update_time[vin] = round(time.time())
-                    if self.enable_websocket and self.is_in_gear(vin=vin):
+                    # if self.enable_websocket and self.is_in_gear(vin=vin):
+                    if self.enable_websocket:
                         asyncio.create_task(
                             self.__connection.websocket_connect(
                                 vin[-5:],
