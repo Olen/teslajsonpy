@@ -22,6 +22,7 @@ from typing import Dict, Text
 import aiohttp
 from bs4 import BeautifulSoup
 import httpx
+import websockets
 import yarl
 from yarl import URL
 
@@ -49,7 +50,7 @@ class Connection:
         refresh_token: Text = None,
         authorization_token: Text = None,
         expiration: int = 0,
-        auth_domain: str = AUTH_DOMAIN
+        auth_domain: str = AUTH_DOMAIN,
     ) -> None:
         """Initialize connection object."""
         self.user_agent: Text = "Model S 2.1.79 (SM-G900V; Android REL 4.4.4; en_US"
@@ -280,36 +281,52 @@ class Connection:
                     _LOGGER.debug("WSMsgType error")
                     break
 
+        async def _keepalive() -> None:
+            """Send keepalives to keep websocket connection alive."""
+            keepalive_seq = 1
+            nonlocal disconnected
+            while not disconnected:
+                await asyncio.sleep(WEBSOCKET_TIMEOUT - 1)
+                await self.websocket.send(keepalive_seq)
+                keepalive_seq = keepalive_seq + 1
+                if keepalive_seq > 100:
+                    keepalive_seq = 1
+
         disconnected = False
         last_message_time = time.time()
         timeout = last_message_time + DRIVING_INTERVAL
         if not self.websocket or self.websocket.closed:
             _LOGGER.debug("%s:Connecting to websocket %s", vin[-5:], self.websocket_url)
-            self.websocket = await self.websession.ws_connect(self.websocket_url)
+            # self.websocket = await self.websession.ws_connect(self.websocket_url)
+            self.websocket = await websockets.client.connect(
+                self.websocket_url, ping_interval=10
+            )
             loop = asyncio.get_event_loop()
             loop.create_task(_process_messages())
+            # loop.create_task(_keepalive())
         while not (
             disconnected
             or time.time() - last_message_time > WEBSOCKET_TIMEOUT
             or time.time() > timeout
         ):
             _LOGGER.debug("%s:Trying to subscribe to websocket", vin[-5:])
-            await self.websocket.send_json(
-                data={
-                    "msg_type": "data:subscribe_oauth",
-                    "token": self.access_token,
-                    "value": "shift_state,speed,power,est_lat,est_lng,est_heading,est_corrected_lat,est_corrected_lng,native_latitude,native_longitude,native_heading,native_type,native_location_supported",
-                    # "value": "speed,odometer,soc,elevation,est_heading,est_lat,est_lng,power,shift_state,range,est_range,heading",
-                    # old values
-                    "tag": f"{vehicle_id}",
-                    "created:timestamp": round(time.time() * 1000),
-                }
+            # await self.websocket.send_json(
+            #     data={
+            await self.websocket.send(
+                json.dumps(
+                    {
+                        "msg_type": "data:subscribe_oauth",
+                        "token": self.access_token,
+                        "value": "shift_state,speed,power,est_lat,est_lng,est_heading,est_corrected_lat,est_corrected_lng,native_latitude,native_longitude,native_heading,native_type,native_location_supported",
+                        # "value": "speed,odometer,soc,elevation,est_heading,est_lat,est_lng,power,shift_state,range,est_range,heading",
+                        # old values
+                        "tag": f"{vehicle_id}",
+                        "created:timestamp": round(time.time() * 1000),
+                    }
+                )
             )
             await asyncio.sleep(WEBSOCKET_TIMEOUT - 1)
-        _LOGGER.debug(
-            "%s:Exiting websocket_connect",
-            vin[-5:],
-        )
+        _LOGGER.debug("%s:Exiting websocket_connect", vin[-5:])
 
     # async def websocket_connect2(self, vin: int, vehicle_id: int, **kwargs):
     #     """Connect to Tesla streaming websocket.
@@ -539,8 +556,7 @@ class Connection:
             "redirect_uri": "https://auth.tesla.com/void/callback",
         }
         auth = await self.websession.post(
-            str(self.auth_domain.with_path("/oauth2/v3/token")),
-            data=oauth,
+            str(self.auth_domain.with_path("/oauth2/v3/token")), data=oauth
         )
         return auth.json()
 
@@ -558,8 +574,7 @@ class Connection:
             "scope": "openid email offline_access",
         }
         auth = await self.websession.post(
-            str(self.auth_domain.with_path("/oauth2/v3/token")),
-            data=oauth,
+            str(self.auth_domain.with_path("/oauth2/v3/token")), data=oauth
         )
         return auth.json()
 
@@ -574,9 +589,7 @@ class Connection:
             "client_id": self.client_id,
             "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
         }
-        head = {
-            "Authorization": f"Bearer {access_token}",
-        }
+        head = {"Authorization": f"Bearer {access_token}"}
         auth = await self.websession.post(
             "https://owner-api.teslamotors.com/oauth/token", headers=head, data=oauth
         )

@@ -33,6 +33,7 @@ beautifulsoup4 = "^4.9.3"
 wrapt = "^1.12.1"
 authcaptureproxy = "^1.0.2"
 httpx = ">=0.17.1, <1.0"
+websockets = "^9.1"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.9.0"
@@ -58,4 +59,3 @@ build-backend = "poetry.core.masonry.api"
 
 [metadata]
 description-file = "README.md"
-
