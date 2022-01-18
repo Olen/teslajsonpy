@@ -22,7 +22,6 @@ from typing import Dict, Text
 import aiohttp
 from bs4 import BeautifulSoup
 import httpx
-import websockets
 import yarl
 from yarl import URL
 
@@ -297,10 +296,13 @@ class Connection:
         timeout = last_message_time + DRIVING_INTERVAL
         if not self.websocket or self.websocket.closed:
             _LOGGER.debug("%s:Connecting to websocket %s", vin[-5:], self.websocket_url)
-            # self.websocket = await self.websession.ws_connect(self.websocket_url)
-            self.websocket = await websockets.client.connect(
-                self.websocket_url, ping_interval=10
+            session = aiohttp.ClientSession()
+            self.websocket = await session.ws_connect(
+                url=self.websocket_url, heartbeat=10
             )
+            # self.websocket = await websockets.client.connect(
+            #     self.websocket_url, ping_interval=10
+            # )
             loop = asyncio.get_event_loop()
             loop.create_task(_process_messages())
             # loop.create_task(_keepalive())
@@ -310,20 +312,19 @@ class Connection:
             or time.time() > timeout
         ):
             _LOGGER.debug("%s:Trying to subscribe to websocket", vin[-5:])
-            # await self.websocket.send_json(
-            #     data={
-            await self.websocket.send(
-                json.dumps(
-                    {
-                        "msg_type": "data:subscribe_oauth",
-                        "token": self.access_token,
-                        "value": "shift_state,speed,power,est_lat,est_lng,est_heading,est_corrected_lat,est_corrected_lng,native_latitude,native_longitude,native_heading,native_type,native_location_supported",
-                        # "value": "speed,odometer,soc,elevation,est_heading,est_lat,est_lng,power,shift_state,range,est_range,heading",
-                        # old values
-                        "tag": f"{vehicle_id}",
-                        "created:timestamp": round(time.time() * 1000),
-                    }
-                )
+            # await self.websocket.send(
+            #     json.dumps(
+            #        {
+            await self.websocket.send_json(
+                data={
+                    "msg_type": "data:subscribe_oauth",
+                    "token": self.access_token,
+                    "value": "shift_state,speed,power,est_lat,est_lng,est_heading,est_corrected_lat,est_corrected_lng,native_latitude,native_longitude,native_heading,native_type,native_location_supported",
+                    # "value": "speed,odometer,soc,elevation,est_heading,est_lat,est_lng,power,shift_state,range,est_range,heading",
+                    # old values
+                    "tag": f"{vehicle_id}",
+                    "created:timestamp": round(time.time() * 1000),
+                }
             )
             await asyncio.sleep(WEBSOCKET_TIMEOUT - 1)
         _LOGGER.debug("%s:Exiting websocket_connect", vin[-5:])
