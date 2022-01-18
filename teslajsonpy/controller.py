@@ -1553,11 +1553,11 @@ class Controller:
 
     def _vehicle_id_to_vin(self, vehicle_id: Text) -> Optional[Text]:
         """Return vin for a vehicle_id."""
-        return self.__vehicle_id_vin_map.get(vehicle_id)
+        return self.__vehicle_id_vin_map.get(str(vehicle_id))
 
     def _vehicle_id_to_id(self, vehicle_id: Text) -> Optional[Text]:
         """Return car_id for a vehicle_id."""
-        return self._vin_to_id(self._vehicle_id_to_vin(vehicle_id))
+        return self._vin_to_id(self._vehicle_id_to_vin(str(vehicle_id)))
 
     def vin_to_vehicle_id(self, vin: Text) -> Optional[Text]:
         """Return vehicle_id for a vin."""
@@ -1578,7 +1578,7 @@ class Controller:
         if data["msg_type"] == "data:update":
             update_json = {}
             vehicle_id = int(data["tag"])
-            vin = self.__vehicle_id_vin_map[vehicle_id]
+            vin = self._vehicle_id_to_vin(vehicle_id)
             # shift_state,speed,power,est_lat,est_lng,est_heading,est_corrected_lat,est_corrected_lng,
             # native_latitude,native_longitude,native_heading,native_type,native_location_supported
             keys = [
